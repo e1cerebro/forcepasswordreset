@@ -193,47 +193,81 @@ class Chris_Force_Password_Reset_Admin {
 	}
 
 
+	/**
+	 * Validate the password reset status.
+	 * This function runs anytime the user visits the admin page
+	 * 
+	 * LOGIC
+	 * -------------
+	 * 1. get the number of days between today and when password was last changed
+	 * 2. Check if the days has past 
+	 * 3. Redirect the user to the appropriate page
+	 * 
+	 * @return void
+	 */
 	public function valid_password_reset() {
+			//Get the number of days between now and when the password was last updated.
+			$proceed = $this->get_date_diff();
 
-		$proceed = $this->get_date_diff();
-
-		if( $proceed > $number_of_days){
-			  $this->redirect_user();
-			 //die("Point User to your custom password reset page");
-		 }
+			//If the days are greater than what was specified by the admin.
+			if( $proceed > $this->get_password_reset_days()){
+				//Redirect the user to the reset password page.
+				$this->redirect_user();
+			}
 	}
 
-
+	/**
+	 * This function is used to display the notification message 
+	 * on the admin page.
+	 * 
+	 * it is only displayed when the password is due for reset.
+	 * 
+	 * 
+	 * LOGIC
+	 * -------------
+	 * 1. Check is the number of days is due for changes
+	 * 2. Create a URL link to reset password.
+	 * 3. Calculate the number of days past
+	 * 4. Display the notification message.
+	 *
+	 * @return void
+	 */
 	function my_error_notice() {
-			
-		  $options = get_option($this->plugin_name);
-		
-			$number_of_days = $options['number_of_days'];
-			
-
-			if($this->get_date_diff() > $number_of_days){
-
+			//Check is the number of days is due for changes
+			if($this->get_date_diff() > $this->get_password_reset_days() ){
+			//Create a URL link to reset password.
 			$url = wp_lostpassword_url( $redirect );
 			$reset_link = "<a href={$url}>  RESET PASSWORD</a>";
-
+			//Calculate the number of days past
+			$days_past  = $this->get_date_diff() - $this->get_password_reset_days();
+			//Display the notification message.
 		?>
-			 <div class="notice error my-acf-notice is-dismissible">
-				<p><?php _e( "Your current password was due for reset {$this->get_date_diff()} day(s) ago.{$reset_link}", 'my_plugin_textdomain' ); ?></p>
+			 <div class="notice error is-dismissible">
+				<p><?php _e( "Your current password was due for reset {$days_past} day(s) ago.{$reset_link}", 'my_plugin_textdomain' ); ?></p>
 			</div>
 		<?php
-			// wp_logout();
-			// $this->redirect_user();
-		
+
 		}
 
 	}
 
+	/**
+	 * This function to calculate the date difference between today and the last time the password was updated.
+	 * 
+	 * LOGIC
+	 * 1. Configure the option key
+	 * 2. Get the current last password updated time
+	 * 3. Get the current date  now
+	 * 4. Convert both dates to DateTime
+	 * 5. Find the diff between the two dates.
+	 * 6. return the number of days
+	 * 
+	 * @return integer
+	 */
+
 	private function get_date_diff(){
 		 
-		$options = get_option($this->plugin_name);
-		
-		$number_of_days = $options['number_of_days'];
-
+	
 		//configure the option value
 		$current_logged_in_user_id = get_current_user_id()."_password_update_timestamp";
 
@@ -243,13 +277,28 @@ class Chris_Force_Password_Reset_Admin {
  		//get the current time  
 		$now = date('Y-m-d');
 
+		//Convert to date times
 		$last_updated  = new DateTime($last_password_update_time);
 		$today         = new DateTime($now);
 
+		//get the diff
 		$datediff	   = $last_updated->diff($today);
 
+		//return number of days
  		return $datediff->d;
 	}
+
+	/**
+	 * Redirect the user to password reset Page.
+	 * 
+	 * LOGIC
+	 * ---------------------------------
+	 * The logic behind this function is to get the current ID of the logged in user
+	 * destroy the session data based on that user and then go ahead to log the user
+	 * out of the admin page]
+	 * 
+	 * redirect the user to the password reset page and exit the page
+	 */
 
 	private function redirect_user(){
 
@@ -262,20 +311,24 @@ class Chris_Force_Password_Reset_Admin {
 		wp_logout();
 
 		//redirect the user to the password reset page with a message to change password.
-		wp_redirect($request = $_SERVER["HTTP_REFERER"]);
+		wp_redirect(wp_lostpassword_url($redirect));
 
 		exit;
 	}
 
-	public static function modifyLostPasswordURL($lostpwUrl, $redirect = '') {
-        $lostpwUrl = wp_login_url() . '#lostpassword'; // Link to lostpassword URL
+	/**
+	 * Gets the number of days setup by the admin  for the password to resetted.
+	 *
+	 * @return integer
+	 */
+	private function get_password_reset_days(){
+		$options = get_option($this->plugin_name);
+		$number_of_days = $options['number_of_days'];
 
-        if(!empty($redirect)) {
-            $lostpwUrl = add_query_arg('redirect_to', urlencode($redirect), $lostpwUrl);
-        }
+		return $number_of_days;
+	}
 
-        return $lostpwUrl;
-    }
+
 
 }
 
